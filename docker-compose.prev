@@ -1,0 +1,76 @@
+# docker-compose.yaml
+services:
+  test_host: # this is the name of the service and name of the host (POSTGRES_HOST)
+    restart: unless-stopped
+    container_name: ${POSTGRES_HOST}
+    image: postgres:alpine
+    command: postgres -c max_connections=100 -c shared_buffers=256MB
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${PG_PORT}:${POSTGRES_PORT}"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-h", "localhost", "-p", "${POSTGRES_PORT}", "-U", "${POSTGRES_USER}" ]
+      # add -h dd in order to avoid message FATAL: role 'root' doesnot exist
+      interval: 10s # 1m30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+      start_interval: 5s
+  
+  adminer:
+    container_name: test_admin
+    image: adminer:4.8.1
+    restart: unless-stopped
+    depends_on:
+      test_host:
+        condition: service_healthy
+    environment:
+      - ADMINER_PLUGINS=tables-filter enum-option enum-types
+      - ADMINER_DESIGN=nette
+    ports:
+      - "${ADMINER_PORTS}"
+  
+  test_mongodb:
+    image: mongo:4.4.20
+    container_name: ${MONGO_HOST}
+    depends_on:
+      test_host:
+        condition: service_healthy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+    ports:
+      - "${MONGO_PORT}:${MONGO_PORT}"
+    healthcheck:
+      test: [ "CMD-SHELL", "mongo --host localhost --port ${MONGO_PORT} --eval \"db.adminCommand('ping')\" --quiet || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - mongodb_data:/data/db
+      # - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+  
+  test_mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: ${MONGODB_URL}
+      ME_CONFIG_BASICAUTH_ENABLED: true
+      ME_CONFIG_BASICAUTH_USERNAME: mongoexpressuser
+      ME_CONFIG_BASICAUTH_PASSWORD: mongoexpresspass
+    depends_on:
+      test_mongodb:
+        condition: service_healthy
+
+volumes:
+  pg_data: # postgresql data
+  mongodb_data:
