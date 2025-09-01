@@ -1,6 +1,6 @@
 # docker-compose.yaml
 services:
-  test_host: # this is the name of the service and name of the host (POSTGRES_HOST)
+  test_host:
     restart: unless-stopped
     container_name: ${POSTGRES_HOST}
     image: postgres:alpine
@@ -40,9 +40,9 @@ services:
     container_name: ${MONGODB_REPLICA_SET_HOST}
     hostname: ${MONGODB_REPLICA_SET_HOST}
     ports:
-      - "${MONGODB_PORT}:${MONGODB_PORT}"
+      - "27019:${MONGODB_PORT}"
     volumes:
-      - mongodb_data:/data/db
+      - ./mongodb_data:/data/db
       - ./mongo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
     entrypoint: ["/docker-entrypoint.sh"]
     environment:
