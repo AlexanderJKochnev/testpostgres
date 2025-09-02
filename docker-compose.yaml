@@ -38,6 +38,7 @@ services:
   test_mongodb:
     image: mongo:4.4.20
     container_name: ${MONGO_HOST}
+    
     depends_on:
       test_host:
         condition: service_healthy
