@@ -1,6 +1,6 @@
 # docker-compose.yaml
 services:
-  test_host:
+  test_host: # this is the name of the service and name of the host (POSTGRES_HOST)
     restart: unless-stopped
     container_name: ${POSTGRES_HOST}
     image: postgres:alpine
@@ -12,7 +12,7 @@ services:
     ports:
       - "${PG_PORT}:${POSTGRES_PORT}"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - ./pg_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready", "-h", "localhost", "-p", "${POSTGRES_PORT}", "-U", "${POSTGRES_USER}" ]
       # add -h dd in order to avoid message FATAL: role 'root' doesnot exist
@@ -37,52 +37,37 @@ services:
   
   test_mongodb:
     image: mongo:4.4.20
-    container_name: ${MONGODB_REPLICA_SET_HOST}
-    hostname: ${MONGODB_REPLICA_SET_HOST}
-    ports:
-      - "27019:${MONGODB_PORT}"
-    volumes:
-      - ./mongodb_data:/data/db
-      - ./mongo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
-    entrypoint: ["/docker-entrypoint.sh"]
+    container_name: ${MONGO_HOST}
+    depends_on:
+      test_host:
+        condition: service_healthy
     environment:
-      MONGODB_USER_NAME: ${MONGODB_USER_NAME}
-      MONGODB_USER_PASSWORD: ${MONGODB_USER_PASSWORD}
-      MONGODB_REPLICA_SET: ${MONGODB_REPLICA_SET}
-      MONGODB_REPLICA_SET_HOST: ${MONGODB_REPLICA_SET_HOST}
-      MONGODB_PORT: ${MONGODB_PORT}
-      MONGODB_DATABASE_AUTH_NAME: ${MONGODB_DATABASE_AUTH_NAME}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    ports:
+      - "${OUTER_PORT}:${MONGODB_PORT}"
     healthcheck:
-      test: >
-        mongo --eval "
-          try {
-            rs.status().ok === 1 || db.adminCommand('ping').ok === 1
-          } catch(e) {
-            print('Health check failed:', e);
-            exit(1);
-          }
-        " -u ${MONGODB_USER_NAME} -p ${MONGODB_USER_PASSWORD} --authenticationDatabase ${MONGODB_DATABASE_AUTH_NAME} || exit 1
+      test: [ "CMD-SHELL", "mongo --host localhost --port ${MONGODB_PORT} --eval \"db.adminCommand('ping')\" --quiet || exit 1" ]
       interval: 10s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
-
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - mongodb_data:/data/db
+      # - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+  
   test_mongo-express:
     image: mongo-express
-    container_name: test_mongo-express
+    restart: always
     ports:
-      - "${MONGO_EXPRESS_PORT}:8081"
+      - ${OUTER_EXPRESS_PORT}:${MONGO_EXPRESS_PORT}
     environment:
-      ME_CONFIG_BASICAUTH_ENABLED: "true"
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGODB_USER_NAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGODB_USER_PASSWORD}
-      ME_CONFIG_MONGODB_SERVER: ${MONGODB_REPLICA_SET_HOST}
-      ME_CONFIG_MONGODB_PORT: ${MONGODB_PORT}
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGODB_USER_NAME}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGODB_USER_PASSWORD}
-      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-      ME_CONFIG_MONGODB_REPLICA: ${MONGODB_REPLICA_SET}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USER_NAME}:${MONGODB_USER_PASSWORD}@${MONGODB_REPLICA_SET_HOST}:${MONGODB_PORT}/${MONGODB_DATABASE_AUTH_NAME}?replicaSet=${MONGODB_REPLICA_SET}&authSource=${MONGODB_DATABASE_AUTH_NAME}
+      # mongodb://mongouser:mongopassword@mongodb:27017/myapp_mongodb?authSource=admin
+      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGO_HOST}:${MONGODB_PORT}"
+      ME_CONFIG_BASICAUTH_ENABLED: true
+      ME_CONFIG_MONGODB_AUTH_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD}
     depends_on:
       test_mongodb:
         condition: service_healthy
