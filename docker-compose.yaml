@@ -36,44 +36,5 @@ services:
     ports:
       - "${ADMINER_PORTS}"
   
-  test_mongodb:
-    image: mongo:4.4.20
-    container_name: ${MONGO_HOST}
-    
-    depends_on:
-      test_host:
-        condition: service_healthy
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
-    ports:
-      - "${OUTER_PORT}:${MONGODB_PORT}"
-    healthcheck:
-      test: [ "CMD-SHELL", "mongo --host localhost --port ${MONGODB_PORT} --eval \"db.adminCommand('ping')\" --quiet || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    volumes:
-      - mongodb_data:/data/db
-      # - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-  
-  test_mongo-express:
-    image: mongo-express
-    restart: always
-    ports:
-      - ${OUTER_EXPRESS_PORT}:${MONGO_EXPRESS_PORT}
-    environment:
-      # mongodb://mongouser:mongopassword@mongodb:27017/myapp_mongodb?authSource=admin
-      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGO_HOST}:${MONGODB_PORT}"
-      ME_CONFIG_BASICAUTH_ENABLED: true
-      ME_CONFIG_MONGODB_AUTH_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD}
-    depends_on:
-      test_mongodb:
-        condition: service_healthy
-
 volumes:
   pg_data: # postgresql data
-  mongodb_data:
