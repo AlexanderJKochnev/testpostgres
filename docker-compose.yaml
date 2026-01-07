@@ -47,11 +47,11 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
-    expose:
-      - "27017"
+    ports:
+      - "${MONGODB_OUTER_PORT}:${MONGODB_PORT}"
     volumes:
       - ./mongodb_data:/data/db
-      - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      # - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     command: >
       mongod
       --bind_ip_all
@@ -61,7 +61,13 @@ services:
       --syncdelay 300
       --nojournal
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/admin --quiet --username admin --password admin
+      test: >
+        mongo --username ${MONGO_INITDB_ROOT_USERNAME}
+        --password ${MONGO_INITDB_ROOT_PASSWORD}
+        --authenticationDatabase admin
+        --eval 'db.runCommand("ping").ok'
+        localhost:${MONGODB_PORT}/admin --quiet
+      # test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/admin --quiet --username admin --password admin
       interval: 10s
       timeout: 10s
       retries: 30
@@ -81,11 +87,14 @@ services:
     ports:
       - ${OUTER_EXPRESS_PORT}:${MONGO_EXPRESS_PORT}
     environment:
-      # mongodb://mongouser:mongopassword@mongodb:27017/myapp_mongodb?authSource=admin
-      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGO_HOST}:27017"
-      ME_CONFIG_BASICAUTH_ENABLED: true
-      ME_CONFIG_MONGODB_AUTH_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD}
+      # Добавляем ?authSource=admin в конец строки
+      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGO_HOST}:${MONGODB_PORT}/admin?authSource=admin"
+      ME_CONFIG_MONGODB_SERVER: "${MONGO_HOST}"
+      ME_CONFIG_MONGODB_PORT: "${MONGODB_PORT}"
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
+      ME_CONFIG_BASICAUTH_USERNAME: "admin" # Логин для входа в сам интерфейс Express
+      ME_CONFIG_BASICAUTH_PASSWORD: "${ME_CONFIG_BASICAUTH_PASSWORD}"
     depends_on:
       test_mongodb:
         condition: service_healthy
