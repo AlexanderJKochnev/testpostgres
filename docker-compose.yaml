@@ -47,17 +47,33 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
-    ports:
-      - "${OUTER_PORT}:${MONGODB_PORT}"
-    healthcheck:
-      test: [ "CMD-SHELL", "mongo --host localhost --port ${MONGODB_PORT} --eval \"db.adminCommand('ping')\" --quiet || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+    expose:
+      - "27017"
     volumes:
-      - mongodb_data:/data/db
-      # - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./mongodb_data:/data/db
+      - ./mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: >
+      mongod
+      --bind_ip_all
+      --wiredTigerCacheSizeGB 0.25
+      --storageEngine wiredTiger
+      --journalCommitInterval 500
+      --syncdelay 300
+      --nojournal
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/admin --quiet --username admin --password admin
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
   
   test_mongo-express:
     image: mongo-express
