@@ -1,17 +1,17 @@
-// mongo/mongo-init.js
+// mongo-init.js
 db.createUser({
-  user: process.env.MONGO_USER,
-  pwd: process.env.MONGO_PASSWORD,
+  user: "admin",
+  pwd: "admin",
   roles: [
     {
       role: "readWrite",
-      db: process.env.MONGO_DB_NAME
+      db: "admin"
+    },
+    {
+      role: "userAdminAnyDatabase",
+      db: "admin"
     }
   ]
 });
 
-db = db.getSiblingDB(process.env.MONGO_DB_NAME);
-
-// Создаем коллекции
-db.createCollection("images");
-db.createCollection("documents");
+print("MongoDB initialization completed");
