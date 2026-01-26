@@ -1,9 +1,37 @@
 # docker-compose.yaml
 services:
+  meilisearch:
+    # --- НАСТРОЙКИ ЛОГИРОВАНИЯ ---
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"   # Максимальный размер файла лога: 10 МБ
+        max-file: "3"     # Количество хранимых файлов ротации: 3
+    # -----------------------------
+    container_name: meilisearch
+    image: getmeili/meilisearch:v1.10
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
+      - MEILI_NO_ANALYTICS=true
+    ports:
+      - "7701:7700"
+    volumes:
+      - ./meili_data:/meili_data
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   test_host: # this is the name of the service and name of the host (POSTGRES_HOST)
     restart: unless-stopped
     container_name: ${POSTGRES_HOST}
-    image: postgres:alpine
+    image: ghcr.io/alexanderjkochnev/postgres:17-alpine
+    # image: postgres:17-alpine
     # command: postgres -c max_connections=100 -c shared_buffers=256MB
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -25,7 +53,8 @@ services:
   
   adminer:
     container_name: test_admin
-    image: adminer:4.8.1
+    image: ghcr.io/alexanderjkochnev/adminer:4.8.1
+    # image: adminer:4.8.1
     restart: unless-stopped
     depends_on:
       test_host:
@@ -37,7 +66,7 @@ services:
       - "${ADMINER_PORTS}"
   
   test_mongodb:
-    image: mongo:4.4.20
+    image: ghcr.io/alexanderjkochnev/mongo:4.4.20
     container_name: ${MONGO_HOST}
     
     depends_on:
@@ -82,7 +111,7 @@ services:
           memory: 512M
   
   test_mongo-express:
-    image: mongo-express
+    image: ghcr.io/alexanderjkochnev/mongo-express
     restart: always
     ports:
       - ${OUTER_EXPRESS_PORT}:${MONGO_EXPRESS_PORT}
@@ -102,3 +131,4 @@ services:
 volumes:
   pg_data: # postgresql data
   mongodb_data:
+  meili_data:
